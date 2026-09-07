@@ -146,3 +146,80 @@ class ConditionalExpectationEstimator:
         Y = np.asarray(Y)
         predictions = self.predict(Y)
         return np.mean((predictions-X_true))
+    
+def gaussian_conditional_mean(
+        y: ArrayLike,
+        mu_x: float,
+        mu_y: float,
+        sigma_x: float,
+        sigma_y: float,
+        rho: float
+) -> np.ndarray:
+    y = np.asarray(y)
+    return mu_x + rho*(sigma_x/sigma_y)*(y-mu_y)
+
+def gaussian_conditional_variance(sigma_x: float, rho: float):
+    # calculates variance for bivariate gaussian
+    return sigma_x**2*(1-rho**2)
+
+def simulate_bivariate_gaussian(
+        n:int,
+        mu_x: float=0,
+        mu_y: float=0,
+        sigma_x: float=1,
+        sigma_y: float=1,
+        rho: float=0.5,
+        random_state: Optional[int]=None
+) -> Tuple[np.ndarray, np.ndarray]:
+    # generate samples from bivariate gaussian distribution
+    # uses Cholesky decomposition for numerical stability
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    # standard normal samples
+    Z = np.random.randn(n,2)
+
+    #Cholesky factor of correlation matrix
+    X = mu_x + sigma_x*Z[:,0]
+    Y = mu_y + sigma_y*(rho*Z[:,0] + np.sqrt(1-rho**2)*Z[:,1])
+
+    return X,Y
+
+def brownian_bridge_expectation(t: ArrayLike, T:float, x0:float=0, xT:float=0) -> np.ndarray:
+    # brownian motion that is conditioned on its endpoint
+    t = np.asarray(t)
+    if np.any(t<0) or np.any(t>T):
+        raise ValueError(f"All t values must be in [0,{T}]")
+    return x0*(1-t/T)+xT*(t/T)
+
+def brownian_bridge_variance(t: ArrayLike, T:float) -> np.ndarray:
+    # computes Var(B(t)|B(0)=0, B(T)=0)=t*(T-t)/T
+    # maximum variance reached with t=T/2
+    t = np.asarray(t)
+    return t*(T-t)/T
+
+def simulate_brownian_bridge(
+    t: ArrayLike, T:float, x0: float=0, xT: float=0, n_paths:int=1, random_state: Optional[int]=None
+) -> np.ndarray:
+    # simulate brownian bridge paths using the conditional distribution
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    t = np.asarray(t)
+    n_times = len(t)
+
+    # mean and variance at each time
+    mu = brownian_bridge_expectation(t,T,x0,xT)
+    var = brownian_bridge_variance(t,T)
+
+    # generate paths
+    paths = np.zeros((n_paths, n_times))
+    paths[:,0] = x0
+    paths[:,-1] = xT
+
+    # Interior points: sample from conditional distribution
+    for i in range(1,n_times-1):
+        paths[:,i] = mu[i] + np.sqrt(var[i])*np.random.randn(n_paths)
+    
+    return paths
+    
