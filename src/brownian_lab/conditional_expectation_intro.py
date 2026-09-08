@@ -222,4 +222,119 @@ def simulate_brownian_bridge(
         paths[:,i] = mu[i] + np.sqrt(var[i])*np.random.randn(n_paths)
     
     return paths
+
+def demonstrate_conditional_expectation(n_samples:int=5000, rho:float=0.7, n_bins:int=20, figsize: Tuple[int,int]=(14,10)) -> dict:
+    # this function serves as : a visual teaching tool and a validation of estimation methods
+    print("="*60)
+    print("Conditional Expectation Demonstration")
+    print("="*60)
+
+    # generate data
+    X, Y = simulate_bivariate_gaussian(n_samples, rho=rho, random_state=42)
+
+    # fit estimators
+    binning_est = ConditionalExpectationEstimator(method='binning', n_bins=n_bins)
+    regression_est = ConditionalExpectationEstimator(method='regression')
+    kernel_est = ConditionalExpectationEstimator(method='kernel')
+
+    binning_est.fit(X,Y)
+    regression_est.fit(X,Y)
+    kernel_est.fit(X,Y)
+
+    # create prediction grid
+    y_grid = np.linspace(Y.min(), Y.max(), 200)
+
+    # predictions
+    pred_binning = binning_est.predict(y_grid)
+    pred_regression = regression_est.predict(y_grid)
+    pred_kernel = kernel_est.predict(y_grid)
+    pred_true = gaussian_conditional_mean(y_grid,0,0,1,1,rho)
+
+    # compute MSEs
+    true_at_Y = gaussian_conditional_mean(Y,0,0,1,1,rho)
+    mse_binning = np.mean((binning_est.predict(Y)-true_at_Y)**2)
+    mse_regression = np.mean((regression_est.predict(Y)-true_at_Y)**2)
+    mse_kernel = np.mean((kernel_est.predict(Y)-true_at_Y)**2)
+
+    # plot
+    fig, axes = plt.subplots(2,2, figsize=figsize)
+
+    # plot 1: data with all estimators
+    ax1 = axes[0,0]
+    idx = np.random.choice(n_samples, min(1500, n_samples), replace=False)
+    ax1.scatter(Y[idx], X[idx], alpha=0.2, s=10, c='gray', label='Data')
+    ax1.plot(y_grid, pred_true, 'g-', lw=3, label='True E[X|Y]')
+    ax1.plot(y_grid, pred_regression, 'b--', lw=2, label='regression')
+    ax1.plot(y_grid, pred_binning, 'r', lw=2, label='binning')
+    ax1.plot(y_grid, pred_kernel, 'm-', lw=2, label='kernel')
+    ax1.set_xlabel('Y')
+    ax1.set_ylabel('X')
+    ax1.set_title(f'Conditional Expectation Estimation (rho={rho})')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # plot 2: Estimation errors
+    ax2 = axes[0,1]
+    ax2.plot(y_grid, pred_regression-pred_true, 'b-', lw=2, label=f'regression (MSE={mse_regression:.2e})')
+    ax2.plot(y_grid, pred_binning-pred_true, 'b-', lw=2, label=f'binning (MSE={mse_binning:.2e})')
+    ax2.plot(y_grid, pred_kernel-pred_true, 'b-', lw=2, label=f'kernel (MSE={mse_kernel:.2e})')
+    ax2.axhline(y=0, color='green', linestyle='--', lw=2)
+    ax2.set_xlabel('Y')
+    ax2.set_ylabel('Error')
+    ax2.set_title('Estimation Error vs True E[X|Y]')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    # plot 3: Brownian Bridge
+    ax3 = axes[1,0]
+    T=1.0
+    t=np.linspace(0,T,100)
+    bridge_paths = simulate_brownian_bridge(t,T,x0=0,xT=0,n_paths=20, random_state=42)
+    bridge_mean = brownian_bridge_expectation(t,T,0,0)
+    bridge_std = np.sqrt(brownian_bridge_variance(t,T))
+
+    for path in bridge_paths:
+        ax3.plot(t, path, 'b-', alpha=0.3, lw=0.8)
+    ax3.plot(t, bridge_mean, 'r-', lw=3, label='E[B(t)|B(0)=0, B(T)=0]')
+    ax3.fill_between(t, bridge_mean-2*bridge_std, bridge_mean+2*bridge_std, alpha=0.2, color='red', label='+2*std band')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+
+    # plot 4: Bridge variance
+    ax4 = axes[1,1]
+    ax4.plot(t, bridge_std**2, 'purple', lw=3)
+    ax4.axvline(x=T/2, color='red', linestyle='--', label=f'Max variance at t=T/2')
+    ax4.set_xlabel('Time t')
+    ax4.set_ylabel('Var(B(t)|B(0)=0, B(T)=0)')
+    ax4.set_title('Brownian Bridge Conditional Variance')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig('/figures/conditional_expec_demo.png', dpi=150,bbox_inches='tight')
+    plt.show()
+
+    # print summary
+    print(f"\nSample size: {n_samples:,}")
+    print(f"Correlation: rho = {rho}")
+    print("\nMean Squared Errors(vs True E[X|Y])")
+    print(f"Regression: {mse_regression:.6f}")
+    print(f"Binning: {mse_binning:.6f}")
+    print(f"Kernel: {mse_kernel:.6f}")
+    print(f"\nIrreducible variance:{gaussian_conditional_variance(1, rho):.4f}")
+
+    return{
+        'estimators':{
+            'binning': binning_est,
+            'regression': regression_est,
+            'kernel': kernel_est,
+        },
+        'mse':{
+            'binning': mse_binning,
+            'regression': mse_regression,
+            'kernel': mse_kernel,
+        },
+        'data':{'X':X, 'Y':Y},
+        'grid': y_grid
+    }
     
