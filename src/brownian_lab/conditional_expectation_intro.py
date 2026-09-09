@@ -277,8 +277,8 @@ def demonstrate_conditional_expectation(n_samples:int=5000, rho:float=0.7, n_bin
     # plot 2: Estimation errors
     ax2 = axes[0,1]
     ax2.plot(y_grid, pred_regression-pred_true, 'b-', lw=2, label=f'regression (MSE={mse_regression:.2e})')
-    ax2.plot(y_grid, pred_binning-pred_true, 'b-', lw=2, label=f'binning (MSE={mse_binning:.2e})')
-    ax2.plot(y_grid, pred_kernel-pred_true, 'b-', lw=2, label=f'kernel (MSE={mse_kernel:.2e})')
+    ax2.plot(y_grid, pred_binning-pred_true, 'r-', lw=2, label=f'binning (MSE={mse_binning:.2e})')
+    ax2.plot(y_grid, pred_kernel-pred_true, 'm-', lw=2, label=f'kernel (MSE={mse_kernel:.2e})')
     ax2.axhline(y=0, color='green', linestyle='--', lw=2)
     ax2.set_xlabel('Y')
     ax2.set_ylabel('Error')
