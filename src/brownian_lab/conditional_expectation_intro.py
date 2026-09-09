@@ -17,6 +17,7 @@ from scipy import stats
 from scipy.interpolate import interp1d
 from typing import Literal, Tuple, Optional
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 class ConditionalExpectationEstimator:
     """
@@ -77,15 +78,15 @@ class ConditionalExpectationEstimator:
 
         self.bin_centers_ = (bin_edges[:-1]+ bin_edges[1:])/2
         self.bin_means_ = np.array([
-            np.mean(X[bin_indices==b] if np.sum(bin_indices == b)>0 else np.nan 
-            for b in range(self.n_bins))
+            np.mean(X[bin_indices==b]) if np.sum(bin_indices == b)>0 else np.nan 
+            for b in range(self.n_bins)
         ])
         self._bin_edges = bin_edges
 
     def _fit_regression(self, X:np.ndarray, Y: np.ndarray) -> None:
         # fit OLS regression estimator
         self.coef_ = np.cov(X,Y)[0,1]/np.var(Y)
-        self.intercept_ = np.mean(X) - np.coef_*np.mean(Y)
+        self.intercept_ = np.mean(X) - self.coef_*np.mean(Y)
 
     def _fit_kernel(self, X: np.ndarray, Y:np.ndarray) -> None:
         # fit Nadaraya-Watson kernel estimator
@@ -101,11 +102,11 @@ class ConditionalExpectationEstimator:
         y_new = np.asarray(y_new)
 
         if self.method == 'binning':
-            self._predict_binning(y_new)
+            return self._predict_binning(y_new)
         elif self.method == 'regression':
-            self._predict_regression(y_new)
+            return self._predict_regression(y_new)
         elif self.method == 'kernel':
-            self._predict_kernel(y_new)
+            return self._predict_kernel(y_new)
 
     def _predict_binning(self, y_new: np.ndarray) -> np.ndarray:
         # predicts using binning with interpolation for smoothness
@@ -119,7 +120,7 @@ class ConditionalExpectationEstimator:
             self.bin_means_[valid],
             kind = 'linear',
             bounds_error = False,
-            fill_value = (self.bin_means_[valid][0], self.bin_means_[-1])
+            fill_value = (self.bin_means_[valid][0], self.bin_means_[valid][-1])
         )
         return f(y_new)
 
@@ -145,7 +146,7 @@ class ConditionalExpectationEstimator:
         X_true = np.asarray(X_true)
         Y = np.asarray(Y)
         predictions = self.predict(Y)
-        return np.mean((predictions-X_true))
+        return np.mean((predictions-X_true)**2)
     
 def gaussian_conditional_mean(
         y: ArrayLike,
@@ -252,7 +253,7 @@ def demonstrate_conditional_expectation(n_samples:int=5000, rho:float=0.7, n_bin
 
     # compute MSEs
     true_at_Y = gaussian_conditional_mean(Y,0,0,1,1,rho)
-    mse_binning = np.mean((binning_est.predict(Y)-true_at_Y)**2)
+    mse_binning = np.mean((binning_est.predict(Y) - true_at_Y)**2)
     mse_regression = np.mean((regression_est.predict(Y)-true_at_Y)**2)
     mse_kernel = np.mean((kernel_est.predict(Y)-true_at_Y)**2)
 
@@ -311,7 +312,12 @@ def demonstrate_conditional_expectation(n_samples:int=5000, rho:float=0.7, n_bin
     ax4.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('/figures/conditional_expec_demo.png', dpi=150,bbox_inches='tight')
+    plt.tight_layout()
+
+    figures_dir = Path("figures")
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    plt.savefig(figures_dir / "conditional_expec_demo.png",dpi=150,bbox_inches="tight")
     plt.show()
 
     # print summary
@@ -337,4 +343,26 @@ def demonstrate_conditional_expectation(n_samples:int=5000, rho:float=0.7, n_bin
         'data':{'X':X, 'Y':Y},
         'grid': y_grid
     }
-    
+if __name__=="__main__":
+    # run demo
+    results= demonstrate_conditional_expectation(
+        n_samples= 5000,
+        rho=0.7,
+        n_bins=20
+    )
+
+    print("\n"+"="*60)
+    print("BROWNIAN BRIDGE EAMPLE")
+    print("="*60)
+
+    t_test = np.array([0.0,0.25,0.5,0.75,1.0])
+    T=1.0
+
+    print("Brownian Bridge: B(0)=0 and B(1)=1")
+    print('-'*60)
+    for ti in t_test:
+        mean = brownian_bridge_expectation(ti,T,x0=0,xT=1)
+        var = brownian_bridge_variance(ti,T)
+        print(f"t={ti:.2f}:E[B(t)|..]={mean:.3f}, Var={var:.4f}")
+
+    print("\n Module Demo Complete")
