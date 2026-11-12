@@ -283,18 +283,3 @@ When reading a probability problem, ask:
 7. What distribution \(P_X\) does \(X\) induce?
 
 If you can answer these questions, you can usually identify how the sigma-algebra, random variable, and probability measure fit together.
-
-## 11. One-sentence summary
-
-**The sigma-algebra specifies which events are measurable, the probability measure assigns probabilities to those events, and a random variable is a measurable function that converts outcomes into values while inducing a probability distribution on its value space.**
-"""
-
-output_path = "/mnt/data/sigma_algebras_and_random_variables.md"
-pypandoc.convert_text(
-    markdown,
-    "md",
-    format="md",
-    outputfile=output_path,
-    extra_args=["--standalone"],
-)
-print(f"Created: {output_path}")
